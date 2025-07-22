@@ -40,6 +40,11 @@ def index():
     for capteur in capteurs:
         if capteur["valeur_texte"]:
             capteur["valeur_affichee"] = capteur["valeur_texte"]
+        elif capteur["type"] == "bouton_poussoir":
+            # Affichage optimisé pour les boutons poussoirs
+            capteur["valeur_affichee"] = (
+                "Appuyé" if capteur["valeur"] == 1 else "Relâché"
+            )
         else:
             capteur["valeur_affichee"] = capteur["valeur"]
 
@@ -80,7 +85,7 @@ def couleur():
     hex_color = couleur_hex.lstrip("#")
     rgb = tuple(int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
 
-    # Formater la commande pour l'Arduino
+    # Format optimisé pour Arduino/Raspberry
     commande_couleur = f"SET_COLOR:{rgb[0]},{rgb[1]},{rgb[2]}"
     current_timestamp = int(time.time())
 
@@ -147,11 +152,25 @@ def ajouter_capteur():
                 (type_capteur, valeur_num, current_timestamp),
             )
         except ValueError:
-            # Si la conversion échoue, c'est du texte
-            cursor.execute(
-                "INSERT INTO capteurs (type, valeur, valeur_texte, timestamp_unix) VALUES (%s, %s, %s, %s)",
-                (type_capteur, 0, valeur, current_timestamp),
-            )
+            # Si c'est un bouton poussoir, traiter comme booléen strict
+            if type_capteur == "bouton_poussoir":
+                if valeur.lower() == "true":
+                    valeur_bool = 1
+                elif valeur.lower() == "false":
+                    valeur_bool = 0
+                else:
+                    return "Erreur: bouton_poussoir doit être 'true' ou 'false'", 400
+
+                cursor.execute(
+                    "INSERT INTO capteurs (type, valeur, timestamp_unix) VALUES (%s, %s, %s)",
+                    (type_capteur, valeur_bool, current_timestamp),
+                )
+            else:
+                # Sinon c'est du texte
+                cursor.execute(
+                    "INSERT INTO capteurs (type, valeur, valeur_texte, timestamp_unix) VALUES (%s, %s, %s, %s)",
+                    (type_capteur, 0, valeur, current_timestamp),
+                )
 
         conn.commit()
         cursor.close()
@@ -159,6 +178,46 @@ def ajouter_capteur():
         return redirect("/")
     except Exception as e:
         return f"Erreur lors de l'insertion: {e}", 500
+
+
+@app.route("/api/led", methods=["POST"])
+def api_led():
+    """API REST optimisée pour contrôler la LED"""
+    data = request.get_json()
+
+    if not data or "rgb" not in data:
+        return jsonify({"error": "Fournir 'rgb': [r,g,b]"}), 400
+
+    rgb = data["rgb"]
+    if not isinstance(rgb, list) or len(rgb) != 3:
+        return jsonify({"error": "RGB doit être [R,G,B] avec 3 valeurs"}), 400
+
+    # Valider les valeurs RGB (0-255)
+    if not all(isinstance(val, int) and 0 <= val <= 255 for val in rgb):
+        return jsonify({"error": "Valeurs RGB: entiers entre 0 et 255"}), 400
+
+    # Format optimisé cohérent avec /couleur
+    commande = f"SET_COLOR:{rgb[0]},{rgb[1]},{rgb[2]}"
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        current_timestamp = int(time.time())
+
+        cursor.execute(
+            "INSERT INTO instructions (commande, type, status, timestamp_unix) VALUES (%s, %s, %s, %s)",
+            (commande, "COLOR", "PENDING", current_timestamp),
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify(
+            {"success": True, "message": "Commande LED envoyée", "rgb": rgb}
+        ), 201
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/capteur", methods=["POST"])
@@ -182,11 +241,28 @@ def api_capteur():
                 (data["type"], valeur_num, current_timestamp),
             )
         except (ValueError, TypeError):
-            # Si la conversion échoue, c'est du texte
-            cursor.execute(
-                "INSERT INTO capteurs (type, valeur, valeur_texte, timestamp_unix) VALUES (%s, %s, %s, %s)",
-                (data["type"], 0, str(data["valeur"]), current_timestamp),
-            )
+            # Si c'est un bouton poussoir, traiter comme booléen strict
+            if data["type"] == "bouton_poussoir":
+                valeur_str = str(data["valeur"]).lower()
+                if valeur_str == "true":
+                    valeur_bool = 1
+                elif valeur_str == "false":
+                    valeur_bool = 0
+                else:
+                    return jsonify(
+                        {"error": "bouton_poussoir doit être 'true' ou 'false'"}
+                    ), 400
+
+                cursor.execute(
+                    "INSERT INTO capteurs (type, valeur, timestamp_unix) VALUES (%s, %s, %s)",
+                    (data["type"], valeur_bool, current_timestamp),
+                )
+            else:
+                # Sinon c'est du texte
+                cursor.execute(
+                    "INSERT INTO capteurs (type, valeur, valeur_texte, timestamp_unix) VALUES (%s, %s, %s, %s)",
+                    (data["type"], 0, str(data["valeur"]), current_timestamp),
+                )
 
         conn.commit()
         cursor.close()
