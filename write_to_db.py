@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 import os
 from datetime import datetime
 import sys
+import time
 
 # Charger les variables d'environnement
 load_dotenv()
@@ -36,10 +37,22 @@ def ajouter_donnee_capteur(type_capteur, valeur):
 
     try:
         cursor = conn.cursor()
-        query = "INSERT INTO capteurs (type, valeur, date) VALUES (%s, %s, %s)"
-        cursor.execute(query, (type_capteur, float(valeur), datetime.now()))
+        current_timestamp = int(time.time())
+
+        # Essayer de convertir en nombre, sinon traiter comme texte
+        try:
+            valeur_num = float(valeur)
+            query = "INSERT INTO capteurs (type, valeur, timestamp_unix) VALUES (%s, %s, %s)"
+            cursor.execute(query, (type_capteur, valeur_num, current_timestamp))
+        except ValueError:
+            # Si la conversion échoue, c'est du texte
+            query = "INSERT INTO capteurs (type, valeur, valeur_texte, timestamp_unix) VALUES (%s, %s, %s, %s)"
+            cursor.execute(query, (type_capteur, 0, str(valeur), current_timestamp))
+
         conn.commit()
-        print(f"✅ Données ajoutées: {type_capteur} = {valeur}")
+        print(
+            f"✅ Données ajoutées: {type_capteur} = {valeur} (timestamp: {current_timestamp})"
+        )
         return True
     except Exception as e:
         print(f"❌ Erreur lors de l'insertion: {e}")
@@ -57,10 +70,11 @@ def ajouter_commande(commande):
 
     try:
         cursor = conn.cursor()
-        query = "INSERT INTO instructions (commande, date) VALUES (%s, %s)"
-        cursor.execute(query, (commande, datetime.now()))
+        current_timestamp = int(time.time())
+        query = "INSERT INTO instructions (commande, timestamp_unix) VALUES (%s, %s)"
+        cursor.execute(query, (commande, current_timestamp))
         conn.commit()
-        print(f"✅ Commande ajoutée: {commande}")
+        print(f"✅ Commande ajoutée: {commande} (timestamp: {current_timestamp})")
         return True
     except Exception as e:
         print(f"❌ Erreur lors de l'insertion: {e}")
@@ -78,9 +92,22 @@ def lire_dernieres_donnees(limite=10):
 
     try:
         cursor = conn.cursor(dictionary=True)
-        query = "SELECT * FROM capteurs ORDER BY date DESC LIMIT %s"
+        query = """
+            SELECT *, FROM_UNIXTIME(timestamp_unix) as date_formatted 
+            FROM capteurs 
+            ORDER BY timestamp_unix DESC 
+            LIMIT %s
+        """
         cursor.execute(query, (limite,))
         donnees = cursor.fetchall()
+
+        # Ajouter la valeur affichable
+        for donnee in donnees:
+            if donnee["valeur_texte"]:
+                donnee["valeur_affichee"] = donnee["valeur_texte"]
+            else:
+                donnee["valeur_affichee"] = donnee["valeur"]
+
         return donnees
     except Exception as e:
         print(f"❌ Erreur lors de la lecture: {e}")
@@ -119,7 +146,14 @@ def main():
         donnees = lire_dernieres_donnees()
         print("\n📊 Dernières données des capteurs:")
         for donnee in donnees:
-            print(f"  {donnee['type']}: {donnee['valeur']} ({donnee['date']})")
+            timestamp_str = (
+                f" (Unix: {donnee.get('timestamp_unix', 'N/A')})"
+                if donnee.get("timestamp_unix")
+                else ""
+            )
+            valeur_affichee = donnee.get("valeur_affichee", donnee.get("valeur", "N/A"))
+            date_str = donnee.get("date_formatted", donnee.get("date", "N/A"))
+            print(f"  {donnee['type']}: {valeur_affichee} - {date_str}{timestamp_str}")
     else:
         print("❌ Arguments invalides")
 

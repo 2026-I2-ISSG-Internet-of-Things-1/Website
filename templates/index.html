@@ -195,6 +195,14 @@
             color: #667eea;
         }
         
+        .button-pressed {
+            color: #48bb78;
+        }
+        
+        .button-released {
+            color: #666;
+        }
+        
         /* Styles pour le toggle switch */
         .toggle-switch {
             position: relative;
@@ -275,35 +283,55 @@
     <div class="container">
         <h1><span class="status-indicator"></span>Système IoT Arduino</h1>
         
-        <h2>Données Capteurs en Temps Réel</h2>
+        <h2>Capteur de Température</h2>
         <table>
             <thead>
-                <tr><th>Type Capteur</th><th>Valeur</th><th>Date/Heure</th></tr>
+                <tr><th>Valeur</th><th>Date/Heure</th></tr>
             </thead>
             <tbody>
                 {% for capteur in capteurs %}
+                    {% if capteur.type == 'temperature' %}
                 <tr>
-                    <td>{{ capteur.type.title() }}</td>
-                    <td class="sensor-value">
-                        {% if capteur.type == 'temperature' %}
-                            {{ capteur.valeur }}°C
-                        {% elif capteur.type == 'humidite' %}
-                            {{ capteur.valeur }}%
-                        {% elif capteur.type == 'luminosite' %}
-                            {{ capteur.valeur }} lux
-                        {% elif capteur.type == 'pression' %}
-                            {{ capteur.valeur }} hPa
-                        {% elif 'colorimetrie' in capteur.type %}
-                            {{ capteur.valeur }}
-                        {% elif capteur.type == 'bouton_poussoir' %}
-                            {{ "Pressé" if capteur.valeur == 1 else "Relâché" }}
-                        {% else %}
-                            {{ capteur.valeur }}
-                        {% endif %}
-                    </td>
-                    <td>{{ capteur.date.strftime('%H:%M:%S') if capteur.date else 'N/A' }}</td>
+                    <td class="sensor-value">{{ capteur.valeur_affichee }}°C</td>
+                    <td>{{ capteur.date.strftime('%H:%M:%S - %d/%m/%Y') if capteur.date else 'N/A' }}</td>
                 </tr>
+                    {% endif %}
                 {% endfor %}
+                {% if not capteurs or not capteurs|selectattr('type', 'equalto', 'temperature')|list %}
+                <tr>
+                    <td colspan="2" style="text-align: center; color: #666; font-style: italic;">
+                        Aucune donnée de température disponible
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+
+        <h2>Bouton Poussoir</h2>
+        <table>
+            <thead>
+                <tr><th>État</th><th>Date/Heure</th></tr>
+            </thead>
+            <tbody>
+                {% for capteur in capteurs %}
+                    {% if capteur.type == 'bouton_poussoir' %}
+                <tr>
+                    <td class="sensor-value">
+                        <span class="{% if capteur.valeur == 1 %}button-pressed{% else %}button-released{% endif %}">
+                            {{ "🟢 Pressé" if capteur.valeur == 1 else "⚪ Relâché" }}
+                        </span>
+                    </td>
+                    <td>{{ capteur.date.strftime('%H:%M:%S - %d/%m/%Y') if capteur.date else 'N/A' }}</td>
+                </tr>
+                    {% endif %}
+                {% endfor %}
+                {% if not capteurs or not capteurs|selectattr('type', 'equalto', 'bouton_poussoir')|list %}
+                <tr>
+                    <td colspan="2" style="text-align: center; color: #666; font-style: italic;">
+                        Aucune donnée de bouton poussoir disponible
+                    </td>
+                </tr>
+                {% endif %}
             </tbody>
         </table>
 

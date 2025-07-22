@@ -3,6 +3,7 @@ import mysql.connector
 from dotenv import load_dotenv
 import os
 from datetime import datetime
+import time
 
 # Charger les variables d'environnement
 load_dotenv()
@@ -23,8 +24,28 @@ def get_db_connection():
 def index():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM capteurs ORDER BY date DESC LIMIT 10")
+
+    # Récupérer seulement les capteurs utiles (exclure test_config)
+    cursor.execute("""
+        SELECT *, 
+               FROM_UNIXTIME(timestamp_unix) as date_formatted,
+               timestamp_unix
+        FROM capteurs 
+        WHERE type IN ('temperature', 'bouton_poussoir', 'capteur_texte') 
+        ORDER BY timestamp_unix DESC LIMIT 20
+    """)
     capteurs = cursor.fetchall()
+
+    # Ajouter une valeur affichable qui combine valeur numérique et texte
+    for capteur in capteurs:
+        if capteur["valeur_texte"]:
+            capteur["valeur_affichee"] = capteur["valeur_texte"]
+        else:
+            capteur["valeur_affichee"] = capteur["valeur"]
+
+        # Utiliser la date formatée pour l'affichage
+        capteur["date"] = capteur["date_formatted"]
+
     cursor.close()
     conn.close()
     return render_template("index.html", capteurs=capteurs)
@@ -33,9 +54,14 @@ def index():
 @app.route("/commande", methods=["POST"])
 def commande():
     action = request.form["commande"]
+    current_timestamp = int(time.time())
+
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO instructions (commande) VALUES (%s)", (action,))
+    cursor.execute(
+        "INSERT INTO instructions (commande, timestamp_unix) VALUES (%s, %s)",
+        (action, current_timestamp),
+    )
     conn.commit()
     cursor.close()
     conn.close()
@@ -56,13 +82,14 @@ def couleur():
 
     # Formater la commande pour l'Arduino
     commande_couleur = f"SET_COLOR:{rgb[0]},{rgb[1]},{rgb[2]}"
+    current_timestamp = int(time.time())
 
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO instructions (commande, type, status) VALUES (%s, %s, %s)",
-            (commande_couleur, "COLOR", "PENDING"),
+            "INSERT INTO instructions (commande, type, status, timestamp_unix) VALUES (%s, %s, %s, %s)",
+            (commande_couleur, "COLOR", "PENDING", current_timestamp),
         )
         conn.commit()
         cursor.close()
@@ -79,7 +106,7 @@ def api_get_instructions():
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
-            "SELECT * FROM instructions WHERE status = 'PENDING' ORDER BY date ASC"
+            "SELECT * FROM instructions WHERE status = 'PENDING' ORDER BY timestamp_unix ASC"
         )
         instructions = cursor.fetchall()
 
@@ -110,10 +137,22 @@ def ajouter_capteur():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO capteurs (type, valeur, date) VALUES (%s, %s, %s)",
-            (type_capteur, float(valeur), datetime.now()),
-        )
+        current_timestamp = int(time.time())
+
+        # Essayer de convertir en nombre, sinon traiter comme texte
+        try:
+            valeur_num = float(valeur)
+            cursor.execute(
+                "INSERT INTO capteurs (type, valeur, timestamp_unix) VALUES (%s, %s, %s)",
+                (type_capteur, valeur_num, current_timestamp),
+            )
+        except ValueError:
+            # Si la conversion échoue, c'est du texte
+            cursor.execute(
+                "INSERT INTO capteurs (type, valeur, valeur_texte, timestamp_unix) VALUES (%s, %s, %s, %s)",
+                (type_capteur, 0, valeur, current_timestamp),
+            )
+
         conn.commit()
         cursor.close()
         conn.close()
@@ -133,10 +172,22 @@ def api_capteur():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO capteurs (type, valeur, date) VALUES (%s, %s, %s)",
-            (data["type"], float(data["valeur"]), datetime.now()),
-        )
+        current_timestamp = int(time.time())
+
+        # Essayer de convertir en nombre, sinon traiter comme texte
+        try:
+            valeur_num = float(data["valeur"])
+            cursor.execute(
+                "INSERT INTO capteurs (type, valeur, timestamp_unix) VALUES (%s, %s, %s)",
+                (data["type"], valeur_num, current_timestamp),
+            )
+        except (ValueError, TypeError):
+            # Si la conversion échoue, c'est du texte
+            cursor.execute(
+                "INSERT INTO capteurs (type, valeur, valeur_texte, timestamp_unix) VALUES (%s, %s, %s, %s)",
+                (data["type"], 0, str(data["valeur"]), current_timestamp),
+            )
+
         conn.commit()
         cursor.close()
         conn.close()
