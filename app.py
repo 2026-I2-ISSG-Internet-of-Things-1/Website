@@ -75,7 +75,7 @@ def commande():
 
 @app.route("/couleur", methods=["POST"])
 def couleur():
-    """Route pour envoyer une couleur vers l'Arduino"""
+    """Route pour envoyer une couleur vers l'Arduino via AWS IoT Core"""
     couleur_hex = request.form.get("couleur")
 
     if not couleur_hex:
@@ -90,6 +90,7 @@ def couleur():
     current_timestamp = int(time.time())
 
     try:
+        # Sauvegarder en base de données comme avant
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
@@ -99,6 +100,19 @@ def couleur():
         conn.commit()
         cursor.close()
         conn.close()
+
+        # 🚀 NOUVEAU: Publier via AWS IoT Core
+        from aws_iot_service import aws_iot_service
+
+        if aws_iot_service.connected:
+            success = aws_iot_service.publish_led_command(list(rgb))
+            if success:
+                print(f"✓ Commande LED envoyée via AWS IoT: RGB{rgb}")
+            else:
+                print(f"✗ Échec envoi AWS IoT, commande en base uniquement")
+        else:
+            print("⚠️  AWS IoT non connecté, commande sauvée en base uniquement")
+
         return redirect("/")
     except Exception as e:
         return f"Erreur lors de l'envoi de la couleur: {e}", 500
@@ -182,7 +196,7 @@ def ajouter_capteur():
 
 @app.route("/api/led", methods=["POST"])
 def api_led():
-    """API REST optimisée pour contrôler la LED"""
+    """API REST optimisée pour contrôler la LED via AWS IoT Core"""
     data = request.get_json()
 
     if not data or "rgb" not in data:
@@ -200,6 +214,7 @@ def api_led():
     commande = f"SET_COLOR:{rgb[0]},{rgb[1]},{rgb[2]}"
 
     try:
+        # Sauvegarder en base de données
         conn = get_db_connection()
         cursor = conn.cursor()
         current_timestamp = int(time.time())
@@ -212,9 +227,22 @@ def api_led():
         cursor.close()
         conn.close()
 
-        return jsonify(
-            {"success": True, "message": "Commande LED envoyée", "rgb": rgb}
-        ), 201
+        # 🚀 NOUVEAU: Publier via AWS IoT Core
+        from aws_iot_service import aws_iot_service
+
+        iot_success = False
+        if aws_iot_service.connected:
+            iot_success = aws_iot_service.publish_led_command(rgb)
+
+        response_data = {
+            "success": True,
+            "message": "Commande LED envoyée",
+            "rgb": rgb,
+            "aws_iot_sent": iot_success,
+            "database_saved": True,
+        }
+
+        return jsonify(response_data), 201
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -229,6 +257,7 @@ def api_capteur():
         return jsonify({"error": "type et valeur requis"}), 400
 
     try:
+        # Sauvegarder en base de données comme avant
         conn = get_db_connection()
         cursor = conn.cursor()
         current_timestamp = int(time.time())
@@ -267,9 +296,70 @@ def api_capteur():
         conn.commit()
         cursor.close()
         conn.close()
-        return jsonify({"success": True, "message": "Données ajoutées"}), 201
+
+        # 🚀 NOUVEAU: Publier les données capteur via AWS IoT Core
+        from aws_iot_service import aws_iot_service
+
+        iot_success = False
+        if aws_iot_service.connected:
+            iot_success = aws_iot_service.publish_sensor_data(
+                sensor_type=data["type"],
+                value=data["valeur"],
+                timestamp=current_timestamp,
+            )
+
+        response_data = {
+            "success": True,
+            "message": "Données ajoutées",
+            "aws_iot_sent": iot_success,
+            "database_saved": True,
+        }
+
+        return jsonify(response_data), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/aws-iot/status", methods=["GET"])
+def aws_iot_status():
+    """API pour vérifier le statut de la connexion AWS IoT Core"""
+    from aws_iot_service import aws_iot_service
+
+    status = {
+        "connected": aws_iot_service.connected,
+        "client_id": aws_iot_service.client_id,
+        "endpoint": aws_iot_service.endpoint,
+        "region": aws_iot_service.region,
+    }
+
+    return jsonify(status), 200
+
+
+@app.route("/api/aws-iot/send-command", methods=["POST"])
+def aws_iot_send_command():
+    """API pour envoyer des commandes génériques via AWS IoT Core"""
+    data = request.get_json()
+
+    if not data or "device_type" not in data or "command" not in data:
+        return jsonify({"error": "device_type et command requis"}), 400
+
+    from aws_iot_service import aws_iot_service
+
+    if not aws_iot_service.connected:
+        return jsonify({"error": "AWS IoT Core non connecté"}), 503
+
+    success = aws_iot_service.publish_device_command(
+        device_type=data["device_type"],
+        command=data["command"],
+        parameters=data.get("parameters", {}),
+    )
+
+    if success:
+        return jsonify(
+            {"success": True, "message": "Commande envoyée via AWS IoT"}
+        ), 200
+    else:
+        return jsonify({"error": "Échec envoi commande AWS IoT"}), 500
 
 
 if __name__ == "__main__":

@@ -3,3 +3,6 @@ mysql-connector-python
 python-dotenv
 requests
 pyserial
+boto3
+awsiotsdk
+paho-mqtt
