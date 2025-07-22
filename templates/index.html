@@ -4,30 +4,414 @@
     <meta charset="UTF-8">
     <title>Capteurs et Commandes</title>
     <style>
-        body { font-family: Arial; margin: 40px; }
-        table { border-collapse: collapse; width: 50%; margin-bottom: 20px; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-        th { background-color: #f2f2f2; }
-        form { margin-top: 20px; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #4a5568;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+        }
+        
+        h2 {
+            color: #2d3748;
+            margin: 30px 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+            display: inline-block;
+        }
+        
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .data-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid #667eea;
+        }
+        
+        table { 
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        
+        th, td { 
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        th { 
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        tr:hover {
+            background-color: #f7fafc;
+        }
+        
+        .control-section {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 20px 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .color-control {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .color-picker-wrapper {
+            position: relative;
+        }
+        
+        input[type="color"] {
+            width: 60px;
+            height: 60px;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s;
+        }
+        
+        input[type="color"]:hover {
+            transform: scale(1.1);
+        }
+        
+        input[type="text"] {
+            padding: 12px 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+            min-width: 200px;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 6px rgba(102, 126, 234, 0.3);
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .color-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 15px;
+            padding: 15px;
+            background: #f7fafc;
+            border-radius: 8px;
+        }
+        
+        .color-preview {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #48bb78;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .sensor-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        /* Styles pour le toggle switch */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 80px;
+            height: 40px;
+            cursor: pointer;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            border-radius: 20px;
+            transition: 0.4s;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 32px;
+            width: 32px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            border-radius: 50%;
+            transition: 0.4s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .toggle-switch input:checked + .toggle-slider {
+            background: linear-gradient(135deg, #48bb78, #38a169);
+        }
+        
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(40px);
+        }
+        
+        .buzzer-control {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .buzzer-label {
+            font-weight: bold;
+            color: #2d3748;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .color-control {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            input[type="text"] {
+                min-width: auto;
+                width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
-    <h1>Données Capteurs</h1>
-    <table>
-        <tr><th>Type</th><th>Valeur</th><th>Date</th></tr>
-        {% for capteur in capteurs %}
-        <tr>
-            <td>{{ capteur.type }}</td>
-            <td>{{ capteur.valeur }}</td>
-            <td>{{ capteur.date }}</td>
-        </tr>
-        {% endfor %}
-    </table>
+    <div class="container">
+        <h1><span class="status-indicator"></span>Système IoT Arduino</h1>
+        
+        <h2>Données Capteurs en Temps Réel</h2>
+        <table>
+            <thead>
+                <tr><th>Type Capteur</th><th>Valeur</th><th>Date/Heure</th></tr>
+            </thead>
+            <tbody>
+                {% for capteur in capteurs %}
+                <tr>
+                    <td>{{ capteur.type.title() }}</td>
+                    <td class="sensor-value">
+                        {% if capteur.type == 'temperature' %}
+                            {{ capteur.valeur }}°C
+                        {% elif capteur.type == 'humidite' %}
+                            {{ capteur.valeur }}%
+                        {% elif capteur.type == 'luminosite' %}
+                            {{ capteur.valeur }} lux
+                        {% elif capteur.type == 'pression' %}
+                            {{ capteur.valeur }} hPa
+                        {% elif 'colorimetrie' in capteur.type %}
+                            {{ capteur.valeur }}
+                        {% elif capteur.type == 'bouton_poussoir' %}
+                            {{ "Pressé" if capteur.valeur == 1 else "Relâché" }}
+                        {% else %}
+                            {{ capteur.valeur }}
+                        {% endif %}
+                    </td>
+                    <td>{{ capteur.date.strftime('%H:%M:%S') if capteur.date else 'N/A' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
 
-    <h2>Envoyer une commande</h2>
-    <form method="post" action="/commande">
-        <input type="text" name="commande" placeholder="Ex : LED_ON" required>
-        <button type="submit">Envoyer</button>
-    </form>
+        <div class="control-section">
+            <h2>Contrôle de la LED RGB</h2>
+            <form method="post" action="/couleur" id="colorForm">
+                <div class="color-control">
+                    <div class="color-picker-wrapper">
+                        <label for="colorPicker">Couleur :</label>
+                        <input type="color" id="colorPicker" name="couleur" value="#ff0000">
+                    </div>
+                    <button type="submit">Appliquer la couleur</button>
+                </div>
+            </form>
+
+            <div class="color-info">
+                <span>Couleur sélectionnée :</span>
+                <span id="colorValue">#ff0000</span>
+                <div id="colorPreview" class="color-preview" style="background-color: #ff0000;"></div>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h2>Contrôle du Buzzer</h2>
+            <div class="buzzer-control">
+                <span class="buzzer-label">🔊 Buzzer :</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="buzzerToggle">
+                    <span class="toggle-slider"></span>
+                </label>
+                <span id="buzzerStatus" style="color: #666;">OFF</span>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h2>Envoi de Texte Libre</h2>
+            <form method="post" action="/commande">
+                <div class="color-control">
+                    <input type="text" name="commande" id="textLibre" placeholder="Tapez votre message ici..." maxlength="32" required>
+                    <button type="submit">Envoyer</button>
+                </div>
+                <div style="margin-top: 10px; font-size: 14px; color: #666;">
+                    <span id="charCount">0</span>/32 caractères
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Mise à jour en temps réel de l'aperçu de couleur
+        document.getElementById('colorPicker').addEventListener('input', function(e) {
+            const color = e.target.value;
+            document.getElementById('colorValue').textContent = color;
+            document.getElementById('colorPreview').style.backgroundColor = color;
+        });
+        
+        // Gestion du toggle buzzer
+        document.getElementById('buzzerToggle').addEventListener('change', function(e) {
+            const isOn = e.target.checked;
+            const statusElement = document.getElementById('buzzerStatus');
+            const command = isOn ? 'BUZZER_ON' : 'BUZZER_OFF';
+            
+            // Mise à jour du texte de statut
+            statusElement.textContent = isOn ? 'ON' : 'OFF';
+            statusElement.style.color = isOn ? '#48bb78' : '#666';
+            statusElement.style.fontWeight = 'bold';
+            
+            // Envoi de la commande
+            fetch('/commande', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'commande=' + encodeURIComponent(command)
+            })
+            .then(response => response.text())
+            .then(data => {
+                console.log('Commande buzzer envoyée:', command);
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                // Revert le toggle en cas d'erreur
+                e.target.checked = !isOn;
+                statusElement.textContent = !isOn ? 'ON' : 'OFF';
+                statusElement.style.color = !isOn ? '#48bb78' : '#666';
+            });
+        });
+        
+        // Gestion du compteur de caractères pour le texte libre
+        document.getElementById('textLibre').addEventListener('input', function(e) {
+            const charCount = e.target.value.length;
+            const charCountElement = document.getElementById('charCount');
+            charCountElement.textContent = charCount;
+            
+            // Changer la couleur selon le nombre de caractères
+            if (charCount > 28) {
+                charCountElement.style.color = '#f56565'; // Rouge quand proche de la limite
+            } else if (charCount > 20) {
+                charCountElement.style.color = '#ed8936'; // Orange
+            } else {
+                charCountElement.style.color = '#666'; // Gris normal
+            }
+        });
+        
+        // Auto-refresh de la page toutes les 30 secondes
+        setTimeout(function() {
+            location.reload();
+        }, 30000);
+    </script>
 </body>
 </html>
