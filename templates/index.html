@@ -292,7 +292,7 @@
                 {% for capteur in capteurs %}
                     {% if capteur.type == 'temperature' %}
                 <tr>
-                    <td class="sensor-value">{{ capteur.valeur_affichee }}°C</td>
+                    <td class="sensor-value">{{ capteur.valeur_affichee }}</td>
                     <td>{{ capteur.date.strftime('%H:%M:%S - %d/%m/%Y') if capteur.date else 'N/A' }}</td>
                 </tr>
                     {% endif %}
