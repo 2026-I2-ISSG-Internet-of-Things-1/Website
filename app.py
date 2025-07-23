@@ -95,6 +95,17 @@ def commande():
     conn.commit()
     cursor.close()
     conn.close()
+    
+    # Envoyer aussi vers le Raspberry Pi
+    raspberry_data = {
+        "type": "command",
+        "name": "Web Command",
+        "value": 1.0,
+        "unit": "cmd",
+        "comment": action
+    }
+    send_to_raspberry(raspberry_data)
+    
     return redirect("/")
 
 
