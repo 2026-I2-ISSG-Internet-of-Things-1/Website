@@ -2,11 +2,24 @@ from flask import Flask, render_template, request, redirect, jsonify
 import mysql.connector
 from dotenv import load_dotenv
 import os
+import requests
 
 # Charger les variables d'environnement
 load_dotenv()
 
 app = Flask(__name__)
+
+# Configuration Raspberry Pi
+RASPBERRY_PI_URL = "http://10.0.215.7:5001"  # IP réelle du Raspberry Pi
+
+
+def send_to_raspberry(data):
+    """Envoie des données vers le Raspberry Pi"""
+    try:
+        response = requests.post(f"{RASPBERRY_PI_URL}/api/data", json=data, timeout=5)
+        return response.status_code == 200
+    except:
+        return False
 
 
 def get_db_connection():
