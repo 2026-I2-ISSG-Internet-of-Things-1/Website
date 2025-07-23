@@ -307,6 +307,30 @@
             </tbody>
         </table>
 
+        <h2>Capteur de Lumière</h2>
+        <table>
+            <thead>
+                <tr><th>Valeur</th><th>Date/Heure</th></tr>
+            </thead>
+            <tbody>
+                {% for capteur in capteurs %}
+                    {% if capteur.type == 'light' %}
+                <tr>
+                    <td class="sensor-value">{{ capteur.valeur_affichee }}</td>
+                    <td>{{ capteur.date.strftime('%H:%M:%S - %d/%m/%Y') if capteur.date else 'N/A' }}</td>
+                </tr>
+                    {% endif %}
+                {% endfor %}
+                {% if not capteurs or not capteurs|selectattr('type', 'equalto', 'light')|list %}
+                <tr>
+                    <td colspan="2" style="text-align: center; color: #666; font-style: italic;">
+                        Aucune donnée de lumière disponible
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+
         <h2>Bouton Poussoir</h2>
         <table>
             <thead>
