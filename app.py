@@ -95,17 +95,17 @@ def commande():
     conn.commit()
     cursor.close()
     conn.close()
-    
+
     # Envoyer aussi vers le Raspberry Pi
     raspberry_data = {
         "type": "command",
         "name": "Web Command",
         "value": 1.0,
         "unit": "cmd",
-        "comment": action
+        "comment": action,
     }
     send_to_raspberry(raspberry_data)
-    
+
     return redirect("/")
 
 
@@ -137,7 +137,17 @@ def couleur():
         cursor.close()
         conn.close()
 
-        print(f"✓ Commande LED sauvegardée: RGB{rgb}")
+        # Envoyer aussi vers le Raspberry Pi
+        raspberry_data = {
+            "type": "command",
+            "name": "LED RGB",
+            "value": 1.0,
+            "unit": "rgb",
+            "comment": commande_couleur,
+        }
+        send_to_raspberry(raspberry_data)
+
+        print(f"✓ Commande LED sauvegardée et envoyée: RGB{rgb}")
         return redirect("/")
     except Exception as e:
         return f"Erreur lors de l'envoi de la couleur: {e}", 500
