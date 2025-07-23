@@ -75,9 +75,34 @@ def index():
         # Utiliser la date formatée pour l'affichage
         capteur["date"] = capteur["date_formatted"]
 
+    # Récupérer la dernière couleur définie
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT MyAssetComment 
+        FROM MyAsset 
+        WHERE MyAssetType = 'color' 
+        ORDER BY MyAssetTimeStamp DESC 
+        LIMIT 1
+    """)
+    last_color_result = cursor.fetchone()
+    
+    # Convertir SET_COLOR:R,G,B en format hex
+    last_color_hex = "#ff0000"  # Couleur par défaut
+    if last_color_result and last_color_result['MyAssetComment']:
+        color_command = last_color_result['MyAssetComment']
+        if color_command.startswith('SET_COLOR:'):
+            try:
+                # Extraire les valeurs RGB
+                rgb_str = color_command.replace('SET_COLOR:', '')
+                r, g, b = map(int, rgb_str.split(','))
+                # Convertir en hex
+                last_color_hex = f"#{r:02x}{g:02x}{b:02x}"
+            except Exception:
+                pass  # Garder la couleur par défaut en cas d'erreur
+
     cursor.close()
     conn.close()
-    return render_template("index.html", capteurs=capteurs)
+    return render_template("index.html", capteurs=capteurs, last_color=last_color_hex)
 
 
 @app.route("/commande", methods=["POST"])

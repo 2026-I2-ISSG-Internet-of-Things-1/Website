@@ -341,7 +341,7 @@
                 <div class="color-control">
                     <div class="color-picker-wrapper">
                         <label for="colorPicker">Couleur :</label>
-                        <input type="color" id="colorPicker" name="couleur" value="#ff0000">
+                        <input type="color" id="colorPicker" name="couleur" value="{{ last_color }}">
                     </div>
                     <button type="submit">Appliquer la couleur</button>
                 </div>
@@ -349,8 +349,8 @@
 
             <div class="color-info">
                 <span>Couleur sélectionnée :</span>
-                <span id="colorValue">#ff0000</span>
-                <div id="colorPreview" class="color-preview" style="background-color: #ff0000;"></div>
+                <span id="colorValue">{{ last_color }}</span>
+                <div id="colorPreview" class="color-preview" style="background-color: {{ last_color }};"></div>
             </div>
         </div>
 
@@ -369,6 +369,14 @@
     </div>
 
     <script>
+        // Initialisation au chargement de la page
+        document.addEventListener('DOMContentLoaded', function() {
+            const colorPicker = document.getElementById('colorPicker');
+            const currentColor = colorPicker.value;
+            document.getElementById('colorValue').textContent = currentColor;
+            document.getElementById('colorPreview').style.backgroundColor = currentColor;
+        });
+        
         // Mise à jour en temps réel de l'aperçu de couleur
         document.getElementById('colorPicker').addEventListener('input', function(e) {
             const color = e.target.value;
