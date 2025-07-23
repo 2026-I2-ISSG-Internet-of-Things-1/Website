@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Script pour écrire directement dans la base de données MariaDB AWS
+Script pour écrire directement dans la base de données MariaDB
 Utilisable depuis Raspberry Pi ou tout autre dispositif
 """
 
