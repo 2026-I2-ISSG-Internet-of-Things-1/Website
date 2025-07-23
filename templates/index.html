@@ -346,18 +346,18 @@
                 <tr>
                     <td class="sensor-value">
                         <span class="button-pressed">
-                            {% if 'up' in capteur.valeur_texte.lower() %}
+                            {% if capteur.valeur_texte and 'up' in capteur.valeur_texte.lower() %}
                                 ⬆️ Haut
-                            {% elif 'down' in capteur.valeur_texte.lower() %}
+                            {% elif capteur.valeur_texte and 'down' in capteur.valeur_texte.lower() %}
                                 ⬇️ Bas
-                            {% elif 'left' in capteur.valeur_texte.lower() %}
+                            {% elif capteur.valeur_texte and 'left' in capteur.valeur_texte.lower() %}
                                 ⬅️ Gauche
-                            {% elif 'right' in capteur.valeur_texte.lower() %}
+                            {% elif capteur.valeur_texte and 'right' in capteur.valeur_texte.lower() %}
                                 ➡️ Droite
-                            {% elif 'middle' in capteur.valeur_texte.lower() %}
+                            {% elif capteur.valeur_texte and 'middle' in capteur.valeur_texte.lower() %}
                                 🔘 Centre
                             {% else %}
-                                🕹️ {{ capteur.valeur_affichee }}
+                                🕹️ {{ capteur.valeur_affichee or 'Actionné' }}
                             {% endif %}
                         </span>
                     </td>
@@ -390,7 +390,7 @@
             <div class="color-info">
                 <span>Couleur sélectionnée :</span>
                 <span id="colorValue">{{ last_color }}</span>
-                <div id="colorPreview" class="color-preview" style="background-color: {{ last_color }};"></div>
+                <div id="colorPreview" class="color-preview"></div>
             </div>
         </div>
 
@@ -413,8 +413,9 @@
         document.addEventListener('DOMContentLoaded', function() {
             const colorPicker = document.getElementById('colorPicker');
             const currentColor = colorPicker.value;
+            const lastColor = '{{ last_color }}';
             document.getElementById('colorValue').textContent = currentColor;
-            document.getElementById('colorPreview').style.backgroundColor = currentColor;
+            document.getElementById('colorPreview').style.backgroundColor = lastColor || currentColor;
         });
         
         // Mise à jour en temps réel de l'aperçu de couleur

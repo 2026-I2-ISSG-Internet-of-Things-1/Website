@@ -36,7 +36,8 @@ def index():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 
-    # Récupérer les derniers capteurs depuis MyAsset - conversion pour compatibilité
+    # Récupérer les derniers capteurs depuis MyAsset - approche mixte
+    # D'abord les capteurs généraux (température, bouton, lumière)
     cursor.execute("""
         SELECT 
             MyAssetNumber as id,
@@ -48,10 +49,33 @@ def index():
             MyAssetName as nom,
             MyAssetUnit as unite
         FROM MyAsset 
-        WHERE MyAssetType IN ('temperature', 'bouton_poussoir', 'capteur_texte', 'humidity', 'pressure', 'light', 'motion', 'button', 'joystick') 
-        ORDER BY MyAssetTimeStamp DESC LIMIT 20
+        WHERE MyAssetType IN ('temperature', 'bouton_poussoir', 'capteur_texte', 'humidity', 'pressure', 'light', 'motion', 'button') 
+        ORDER BY MyAssetTimeStamp DESC LIMIT 80
     """)
     capteurs = cursor.fetchall()
+
+    # Puis ajouter spécifiquement les derniers événements joystick
+    cursor.execute("""
+        SELECT 
+            MyAssetNumber as id,
+            MyAssetType as type,
+            MyAssetValue as valeur,
+            MyAssetComment as valeur_texte,
+            UNIX_TIMESTAMP(MyAssetTimeStamp) as timestamp_unix,
+            MyAssetTimeStamp as date_formatted,
+            MyAssetName as nom,
+            MyAssetUnit as unite
+        FROM MyAsset 
+        WHERE MyAssetType = 'joystick'
+        ORDER BY MyAssetTimeStamp DESC LIMIT 20
+    """)
+    joystick_data = cursor.fetchall()
+
+    # Combiner les deux listes
+    capteurs.extend(joystick_data)
+
+    # Trier par timestamp pour avoir l'ordre chronologique correct
+    capteurs.sort(key=lambda x: x["timestamp_unix"], reverse=True)
 
     # Ajouter une valeur affichable qui combine valeur numérique et texte (compatibilité)
     for capteur in capteurs:
@@ -72,7 +96,10 @@ def index():
                 # Afficher la direction depuis le commentaire
                 capteur["valeur_affichee"] = capteur["valeur_texte"]
             else:
-                capteur["valeur_affichee"] = "Actionné" if capteur["valeur"] == 1 else "Inactif"
+                capteur["valeur_affichee"] = (
+                    "Actionné" if capteur["valeur"] == 1 else "Inactif"
+                )
+                print(f"Debug joystick (pas de texte): valeur={capteur['valeur']}")
         else:
             # Pour les autres capteurs, afficher valeur + unité
             capteur["valeur_affichee"] = (
@@ -110,6 +137,33 @@ def index():
     cursor.close()
     conn.close()
     return render_template("index.html", capteurs=capteurs, last_color=last_color_hex)
+
+
+@app.route("/debug/joystick")
+def debug_joystick():
+    """Route de debug pour voir les données joystick"""
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT * FROM MyAsset 
+        WHERE MyAssetType = 'joystick' 
+        ORDER BY MyAssetTimeStamp DESC 
+        LIMIT 10
+    """)
+    joystick_data = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    html = "<h1>Debug Joystick Data</h1><ul>"
+    for data in joystick_data:
+        html += f"<li>{data['MyAssetTimeStamp']}: {data['MyAssetComment']} (Value: {data['MyAssetValue']})</li>"
+    html += "</ul>"
+    html += f"<p>Total: {len(joystick_data)} entrées trouvées</p>"
+    html += '<a href="/">Retour</a>'
+
+    return html
 
 
 @app.route("/commande", methods=["POST"])
