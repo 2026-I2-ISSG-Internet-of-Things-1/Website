@@ -366,18 +366,6 @@
             </div>
         </div>
 
-        <div class="control-section">
-            <h2>Envoi de Texte Libre</h2>
-            <form method="post" action="/commande">
-                <div class="color-control">
-                    <input type="text" name="commande" id="textLibre" placeholder="Tapez votre message ici..." maxlength="32" required>
-                    <button type="submit">Envoyer</button>
-                </div>
-                <div style="margin-top: 10px; font-size: 14px; color: #666;">
-                    <span id="charCount">0</span>/32 caractères
-                </div>
-            </form>
-        </div>
     </div>
 
     <script>
@@ -418,22 +406,6 @@
                 statusElement.textContent = !isOn ? 'ON' : 'OFF';
                 statusElement.style.color = !isOn ? '#48bb78' : '#666';
             });
-        });
-        
-        // Gestion du compteur de caractères pour le texte libre
-        document.getElementById('textLibre').addEventListener('input', function(e) {
-            const charCount = e.target.value.length;
-            const charCountElement = document.getElementById('charCount');
-            charCountElement.textContent = charCount;
-            
-            // Changer la couleur selon le nombre de caractères
-            if (charCount > 28) {
-                charCountElement.style.color = '#f56565'; // Rouge quand proche de la limite
-            } else if (charCount > 20) {
-                charCountElement.style.color = '#ed8936'; // Orange
-            } else {
-                charCountElement.style.color = '#666'; // Gris normal
-            }
         });
         
         // Auto-refresh de la page toutes les 30 secondes
