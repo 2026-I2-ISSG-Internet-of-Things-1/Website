@@ -335,6 +335,46 @@
             </tbody>
         </table>
 
+        <h2>Joystick Sense HAT</h2>
+        <table>
+            <thead>
+                <tr><th>Direction</th><th>Date/Heure</th></tr>
+            </thead>
+            <tbody>
+                {% for capteur in capteurs %}
+                    {% if capteur.type == 'joystick' %}
+                <tr>
+                    <td class="sensor-value">
+                        <span class="button-pressed">
+                            {% if 'up' in capteur.valeur_texte.lower() %}
+                                ⬆️ Haut
+                            {% elif 'down' in capteur.valeur_texte.lower() %}
+                                ⬇️ Bas
+                            {% elif 'left' in capteur.valeur_texte.lower() %}
+                                ⬅️ Gauche
+                            {% elif 'right' in capteur.valeur_texte.lower() %}
+                                ➡️ Droite
+                            {% elif 'middle' in capteur.valeur_texte.lower() %}
+                                🔘 Centre
+                            {% else %}
+                                🕹️ {{ capteur.valeur_affichee }}
+                            {% endif %}
+                        </span>
+                    </td>
+                    <td>{{ capteur.date.strftime('%H:%M:%S - %d/%m/%Y') if capteur.date else 'N/A' }}</td>
+                </tr>
+                    {% endif %}
+                {% endfor %}
+                {% if not capteurs or not capteurs|selectattr('type', 'equalto', 'joystick')|list %}
+                <tr>
+                    <td colspan="2" style="text-align: center; color: #666; font-style: italic;">
+                        Aucune donnée de joystick disponible
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+
         <div class="control-section">
             <h2>Contrôle de la LED RGB</h2>
             <form method="post" action="/couleur" id="colorForm">

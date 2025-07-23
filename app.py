@@ -48,7 +48,7 @@ def index():
             MyAssetName as nom,
             MyAssetUnit as unite
         FROM MyAsset 
-        WHERE MyAssetType IN ('temperature', 'bouton_poussoir', 'capteur_texte', 'humidity', 'pressure', 'light', 'motion', 'button') 
+        WHERE MyAssetType IN ('temperature', 'bouton_poussoir', 'capteur_texte', 'humidity', 'pressure', 'light', 'motion', 'button', 'joystick') 
         ORDER BY MyAssetTimeStamp DESC LIMIT 20
     """)
     capteurs = cursor.fetchall()
@@ -66,6 +66,13 @@ def index():
             capteur["valeur_affichee"] = (
                 "Appuyé" if capteur["valeur"] == 1 else "Relâché"
             )
+        elif capteur["type"] == "joystick":
+            # Affichage optimisé pour le joystick Sense HAT
+            if capteur["valeur_texte"]:
+                # Afficher la direction depuis le commentaire
+                capteur["valeur_affichee"] = capteur["valeur_texte"]
+            else:
+                capteur["valeur_affichee"] = "Actionné" if capteur["valeur"] == 1 else "Inactif"
         else:
             # Pour les autres capteurs, afficher valeur + unité
             capteur["valeur_affichee"] = (
@@ -85,16 +92,16 @@ def index():
         LIMIT 1
     """)
     last_color_result = cursor.fetchone()
-    
+
     # Convertir SET_COLOR:R,G,B en format hex
     last_color_hex = "#ff0000"  # Couleur par défaut
-    if last_color_result and last_color_result['MyAssetComment']:
-        color_command = last_color_result['MyAssetComment']
-        if color_command.startswith('SET_COLOR:'):
+    if last_color_result and last_color_result["MyAssetComment"]:
+        color_command = last_color_result["MyAssetComment"]
+        if color_command.startswith("SET_COLOR:"):
             try:
                 # Extraire les valeurs RGB
-                rgb_str = color_command.replace('SET_COLOR:', '')
-                r, g, b = map(int, rgb_str.split(','))
+                rgb_str = color_command.replace("SET_COLOR:", "")
+                r, g, b = map(int, rgb_str.split(","))
                 # Convertir en hex
                 last_color_hex = f"#{r:02x}{g:02x}{b:02x}"
             except Exception:
