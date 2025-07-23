@@ -2,7 +2,6 @@ from flask import Flask, render_template, request, redirect, jsonify
 import mysql.connector
 from dotenv import load_dotenv
 import os
-import time
 
 # Charger les variables d'environnement
 load_dotenv()
@@ -24,20 +23,30 @@ def index():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 
-    # Récupérer seulement les capteurs utiles (exclure test_config)
+    # Récupérer les derniers capteurs depuis MyAsset - conversion pour compatibilité
     cursor.execute("""
-        SELECT *, 
-               FROM_UNIXTIME(timestamp_unix) as date_formatted,
-               timestamp_unix
-        FROM capteurs 
-        WHERE type IN ('temperature', 'bouton_poussoir', 'capteur_texte') 
-        ORDER BY timestamp_unix DESC LIMIT 20
+        SELECT 
+            MyAssetNumber as id,
+            MyAssetType as type,
+            MyAssetValue as valeur,
+            MyAssetComment as valeur_texte,
+            UNIX_TIMESTAMP(MyAssetTimeStamp) as timestamp_unix,
+            MyAssetTimeStamp as date_formatted,
+            MyAssetName as nom,
+            MyAssetUnit as unite
+        FROM MyAsset 
+        WHERE MyAssetType IN ('temperature', 'bouton_poussoir', 'capteur_texte', 'humidity', 'pressure', 'light', 'motion', 'button') 
+        ORDER BY MyAssetTimeStamp DESC LIMIT 20
     """)
     capteurs = cursor.fetchall()
 
-    # Ajouter une valeur affichable qui combine valeur numérique et texte
+    # Ajouter une valeur affichable qui combine valeur numérique et texte (compatibilité)
     for capteur in capteurs:
-        if capteur["valeur_texte"]:
+        # Conversion des types pour compatibilité
+        if capteur["type"] == "button":
+            capteur["type"] = "bouton_poussoir"
+
+        if capteur["valeur_texte"] and capteur["unite"] == "text":
             capteur["valeur_affichee"] = capteur["valeur_texte"]
         elif capteur["type"] == "bouton_poussoir":
             # Affichage optimisé pour les boutons poussoirs
@@ -45,7 +54,10 @@ def index():
                 "Appuyé" if capteur["valeur"] == 1 else "Relâché"
             )
         else:
-            capteur["valeur_affichee"] = capteur["valeur"]
+            # Pour les autres capteurs, afficher valeur + unité
+            capteur["valeur_affichee"] = (
+                f"{capteur['valeur']} {capteur.get('unite', '')}"
+            )
 
         # Utiliser la date formatée pour l'affichage
         capteur["date"] = capteur["date_formatted"]
@@ -58,13 +70,14 @@ def index():
 @app.route("/commande", methods=["POST"])
 def commande():
     action = request.form["commande"]
-    current_timestamp = int(time.time())
 
+    # Ajouter la commande comme un asset de type "instruction"
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO instructions (commande, timestamp_unix) VALUES (%s, %s)",
-        (action, current_timestamp),
+        """INSERT INTO MyAsset (MyAssetType, MyAssetName, MyAssetValue, MyAssetUnit, MyAssetComment) 
+           VALUES (%s, %s, %s, %s, %s)""",
+        ("instruction", "Commande Web", 1.0, "cmd", action),
     )
     conn.commit()
     cursor.close()
@@ -86,15 +99,15 @@ def couleur():
 
     # Format optimisé pour Arduino/Raspberry
     commande_couleur = f"SET_COLOR:{rgb[0]},{rgb[1]},{rgb[2]}"
-    current_timestamp = int(time.time())
 
     try:
-        # Sauvegarder en base de données
+        # Sauvegarder en base de données MyAsset
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO instructions (commande, type, status, timestamp_unix) VALUES (%s, %s, %s, %s)",
-            (commande_couleur, "COLOR", "PENDING", current_timestamp),
+            """INSERT INTO MyAsset (MyAssetType, MyAssetName, MyAssetValue, MyAssetUnit, MyAssetComment) 
+               VALUES (%s, %s, %s, %s, %s)""",
+            ("color", "LED Color", 1.0, "rgb", commande_couleur),
         )
         conn.commit()
         cursor.close()
@@ -112,18 +125,21 @@ def api_get_instructions():
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute(
-            "SELECT * FROM instructions WHERE status = 'PENDING' ORDER BY timestamp_unix ASC"
-        )
-        instructions = cursor.fetchall()
 
-        # Marquer les instructions comme envoyées
-        if instructions:
-            instruction_ids = [str(instr["id"]) for instr in instructions]
-            cursor.execute(
-                f"UPDATE instructions SET status = 'SENT' WHERE id IN ({','.join(instruction_ids)})"
-            )
-            conn.commit()
+        # Récupérer les instructions depuis MyAsset
+        cursor.execute("""
+            SELECT 
+                MyAssetNumber as id,
+                MyAssetComment as commande,
+                MyAssetType as type,
+                'PENDING' as status,
+                UNIX_TIMESTAMP(MyAssetTimeStamp) as timestamp_unix
+            FROM MyAsset 
+            WHERE MyAssetType IN ('instruction', 'color') 
+            AND MyAssetTimeStamp >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
+            ORDER BY MyAssetTimeStamp ASC
+        """)
+        instructions = cursor.fetchall()
 
         cursor.close()
         conn.close()
@@ -144,18 +160,35 @@ def ajouter_capteur():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        current_timestamp = int(time.time())
 
         # Essayer de convertir en nombre, sinon traiter comme texte
         try:
             valeur_num = float(valeur)
+            # Déterminer l'unité selon le type
+            unite_map = {
+                "temperature": "°C",
+                "humidity": "%",
+                "pressure": "hPa",
+                "light": "lux",
+                "bouton_poussoir": "bool",
+                "button": "bool",
+            }
+            unite = unite_map.get(type_capteur, "")
+
             cursor.execute(
-                "INSERT INTO capteurs (type, valeur, timestamp_unix) VALUES (%s, %s, %s)",
-                (type_capteur, valeur_num, current_timestamp),
+                """INSERT INTO MyAsset (MyAssetType, MyAssetName, MyAssetValue, MyAssetUnit, MyAssetComment) 
+                   VALUES (%s, %s, %s, %s, %s)""",
+                (
+                    type_capteur,
+                    f"Capteur {type_capteur}",
+                    valeur_num,
+                    unite,
+                    "Ajouté via formulaire",
+                ),
             )
         except ValueError:
             # Si c'est un bouton poussoir, traiter comme booléen strict
-            if type_capteur == "bouton_poussoir":
+            if type_capteur in ["bouton_poussoir", "button"]:
                 if valeur.lower() == "true":
                     valeur_bool = 1
                 elif valeur.lower() == "false":
@@ -164,14 +197,22 @@ def ajouter_capteur():
                     return "Erreur: bouton_poussoir doit être 'true' ou 'false'", 400
 
                 cursor.execute(
-                    "INSERT INTO capteurs (type, valeur, timestamp_unix) VALUES (%s, %s, %s)",
-                    (type_capteur, valeur_bool, current_timestamp),
+                    """INSERT INTO MyAsset (MyAssetType, MyAssetName, MyAssetValue, MyAssetUnit, MyAssetComment) 
+                       VALUES (%s, %s, %s, %s, %s)""",
+                    (
+                        type_capteur,
+                        f"Bouton {type_capteur}",
+                        valeur_bool,
+                        "bool",
+                        "Ajouté via formulaire",
+                    ),
                 )
             else:
                 # Sinon c'est du texte
                 cursor.execute(
-                    "INSERT INTO capteurs (type, valeur, valeur_texte, timestamp_unix) VALUES (%s, %s, %s, %s)",
-                    (type_capteur, 0, valeur, current_timestamp),
+                    """INSERT INTO MyAsset (MyAssetType, MyAssetName, MyAssetValue, MyAssetUnit, MyAssetComment) 
+                       VALUES (%s, %s, %s, %s, %s)""",
+                    (type_capteur, f"Capteur {type_capteur}", 0.0, "text", valeur),
                 )
 
         conn.commit()
@@ -202,14 +243,14 @@ def api_led():
     commande = f"SET_COLOR:{rgb[0]},{rgb[1]},{rgb[2]}"
 
     try:
-        # Sauvegarder en base de données
+        # Sauvegarder en base de données MyAsset
         conn = get_db_connection()
         cursor = conn.cursor()
-        current_timestamp = int(time.time())
 
         cursor.execute(
-            "INSERT INTO instructions (commande, type, status, timestamp_unix) VALUES (%s, %s, %s, %s)",
-            (commande, "COLOR", "PENDING", current_timestamp),
+            """INSERT INTO MyAsset (MyAssetType, MyAssetName, MyAssetValue, MyAssetUnit, MyAssetComment) 
+               VALUES (%s, %s, %s, %s, %s)""",
+            ("color", "LED API", 1.0, "rgb", commande),
         )
         conn.commit()
         cursor.close()
@@ -237,21 +278,38 @@ def api_capteur():
         return jsonify({"error": "type et valeur requis"}), 400
 
     try:
-        # Sauvegarder en base de données comme avant
+        # Sauvegarder en base de données MyAsset
         conn = get_db_connection()
         cursor = conn.cursor()
-        current_timestamp = int(time.time())
 
         # Essayer de convertir en nombre, sinon traiter comme texte
         try:
             valeur_num = float(data["valeur"])
+            # Déterminer l'unité selon le type
+            unite_map = {
+                "temperature": "°C",
+                "humidity": "%",
+                "pressure": "hPa",
+                "light": "lux",
+                "bouton_poussoir": "bool",
+                "button": "bool",
+            }
+            unite = unite_map.get(data["type"], "")
+
             cursor.execute(
-                "INSERT INTO capteurs (type, valeur, timestamp_unix) VALUES (%s, %s, %s)",
-                (data["type"], valeur_num, current_timestamp),
+                """INSERT INTO MyAsset (MyAssetType, MyAssetName, MyAssetValue, MyAssetUnit, MyAssetComment) 
+                   VALUES (%s, %s, %s, %s, %s)""",
+                (
+                    data["type"],
+                    f"API {data['type']}",
+                    valeur_num,
+                    unite,
+                    "Ajouté via API",
+                ),
             )
         except (ValueError, TypeError):
             # Si c'est un bouton poussoir, traiter comme booléen strict
-            if data["type"] == "bouton_poussoir":
+            if data["type"] in ["bouton_poussoir", "button"]:
                 valeur_str = str(data["valeur"]).lower()
                 if valeur_str == "true":
                     valeur_bool = 1
@@ -263,14 +321,28 @@ def api_capteur():
                     ), 400
 
                 cursor.execute(
-                    "INSERT INTO capteurs (type, valeur, timestamp_unix) VALUES (%s, %s, %s)",
-                    (data["type"], valeur_bool, current_timestamp),
+                    """INSERT INTO MyAsset (MyAssetType, MyAssetName, MyAssetValue, MyAssetUnit, MyAssetComment) 
+                       VALUES (%s, %s, %s, %s, %s)""",
+                    (
+                        data["type"],
+                        f"API {data['type']}",
+                        valeur_bool,
+                        "bool",
+                        "Ajouté via API",
+                    ),
                 )
             else:
                 # Sinon c'est du texte
                 cursor.execute(
-                    "INSERT INTO capteurs (type, valeur, valeur_texte, timestamp_unix) VALUES (%s, %s, %s, %s)",
-                    (data["type"], 0, str(data["valeur"]), current_timestamp),
+                    """INSERT INTO MyAsset (MyAssetType, MyAssetName, MyAssetValue, MyAssetUnit, MyAssetComment) 
+                       VALUES (%s, %s, %s, %s, %s)""",
+                    (
+                        data["type"],
+                        f"API {data['type']}",
+                        0.0,
+                        "text",
+                        str(data["valeur"]),
+                    ),
                 )
 
         conn.commit()
@@ -290,8 +362,6 @@ def api_capteur():
 
 if __name__ == "__main__":
     # Configuration pour production/développement
-    import os
-
     port = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_ENV") == "development"
     app.run(host="0.0.0.0", port=port, debug=debug)
