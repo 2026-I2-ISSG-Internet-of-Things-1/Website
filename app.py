@@ -37,7 +37,7 @@ def index():
     cursor = conn.cursor(dictionary=True)
 
     # Récupérer les derniers capteurs depuis MyAsset - approche mixte
-    # D'abord les capteurs généraux (température, bouton, lumière)
+    # D'abord les capteurs généraux (température, bouton, lumière) - limité à 5 par type
     cursor.execute("""
         SELECT 
             MyAssetNumber as id,
@@ -50,11 +50,11 @@ def index():
             MyAssetUnit as unite
         FROM MyAsset 
         WHERE MyAssetType IN ('temperature', 'bouton_poussoir', 'capteur_texte', 'humidity', 'pressure', 'light', 'motion', 'button') 
-        ORDER BY MyAssetTimeStamp DESC LIMIT 80
+        ORDER BY MyAssetTimeStamp DESC LIMIT 25
     """)
     capteurs = cursor.fetchall()
 
-    # Puis ajouter spécifiquement les derniers événements joystick
+    # Puis ajouter spécifiquement les derniers événements joystick - limité à 5
     cursor.execute("""
         SELECT 
             MyAssetNumber as id,
@@ -67,7 +67,7 @@ def index():
             MyAssetUnit as unite
         FROM MyAsset 
         WHERE MyAssetType = 'joystick'
-        ORDER BY MyAssetTimeStamp DESC LIMIT 20
+        ORDER BY MyAssetTimeStamp DESC LIMIT 5
     """)
     joystick_data = cursor.fetchall()
 
@@ -77,12 +77,32 @@ def index():
     # Trier par timestamp pour avoir l'ordre chronologique correct
     capteurs.sort(key=lambda x: x["timestamp_unix"], reverse=True)
 
-    # Ajouter une valeur affichable qui combine valeur numérique et texte (compatibilité)
+    # Limiter chaque type de capteur à 5 entrées maximum
+    capteurs_limites = []
+    compteurs_types = {}
+
     for capteur in capteurs:
+        type_capteur = capteur["type"]
+
         # Conversion des types pour compatibilité
-        if capteur["type"] == "button":
+        if type_capteur == "button":
+            type_capteur = "bouton_poussoir"
             capteur["type"] = "bouton_poussoir"
 
+        # Compter les occurrences de chaque type
+        if type_capteur not in compteurs_types:
+            compteurs_types[type_capteur] = 0
+
+        # N'ajouter que si on n'a pas encore 5 entrées pour ce type
+        if compteurs_types[type_capteur] < 5:
+            capteurs_limites.append(capteur)
+            compteurs_types[type_capteur] += 1
+
+    # Utiliser la liste limitée
+    capteurs = capteurs_limites
+
+    # Ajouter une valeur affichable qui combine valeur numérique et texte (compatibilité)
+    for capteur in capteurs:
         if capteur["valeur_texte"] and capteur["unite"] == "text":
             capteur["valeur_affichee"] = capteur["valeur_texte"]
         elif capteur["type"] == "bouton_poussoir":
